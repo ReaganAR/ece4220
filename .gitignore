@@ -1,0 +1,8 @@
+# Module Files
+*.ko*
+*.mod*
+
+# C Files
+*.o*
+*.symvers
+*.order
