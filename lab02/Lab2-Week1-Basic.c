@@ -126,6 +126,8 @@ int main(int argc, char *argv[]) {
     startTime = clock();
 
     pthread_t threads2[inputRows];
+    int temp = 0; // Temporary fix: thread 0 is always being skipped
+    pthread_create(&(threads2[0]), NULL, &ConvolutionPerRow, &temp);
     for(int i = 0; i < inputRows; i++) {
         int curr_row = i;
         pthread_create(&(threads2[i]), NULL, &ConvolutionPerRow, &curr_row);
