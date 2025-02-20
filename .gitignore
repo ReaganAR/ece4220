@@ -1,3 +1,9 @@
+# Ignore all - Then un-ignore files with extensions - Then un-ignore all directories
+# This combination excludes files without any extensions (executables)
+*
+!*.*
+!*/
+
 # Module Files
 *.ko*
 *.mod*
@@ -6,3 +12,5 @@
 *.o*
 *.symvers
 *.order
+
+
