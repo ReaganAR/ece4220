@@ -13,6 +13,7 @@
 #include <errno.h>
 
 #define MY_PRIORITY (49)  // kernel is priority 50
+#define PERIOD 10000000
 
 void print_results();
 
@@ -63,10 +64,17 @@ void *getFirstThd(void *ptr){
     }
 
 	// Initialize the periodic Task and read line at a time from "First.txt"
+	struct period_info pinfo;
+	periodic_task_init(&pinfo, PERIOD);
 	
 	//Loop{
 	//Read a line then wait_rest_of_period
 	//}
+	while(fgets(commonBuff, sizeof commonBuff, file) != NULL){
+
+		wait_rest_of_period(&pinfo);
+		
+	}
 	//Exit pthread
 	pthread_exit(0);
 }
@@ -94,11 +102,42 @@ void *getSecThd(void *ptr) {
         printf("Failed to open file.\n");
         exit(-1);
     }
+
+	// Initialize the periodic Task and read line at a time from "First.txt"
+	struct period_info pinfo;
+	periodic_task_init(&pinfo, PERIOD);
+	
+	//Loop{
+	//Read a line then wait_rest_of_period
+	//}
+	while(fgets(commonBuff, sizeof commonBuff, file) != NULL){
+		wait_rest_of_period(&pinfo);
+		
+	}
+	//Exit pthread
+	pthread_exit(0);
 }
 
 // Thread-3 to copy the results into final buffer. Arg is Buffers
 void *getThirdThd(void *ptr) {
+	struct Buffers *myBuffers;
+	myBuffers = (struct Buffers *)ptr;
 
+	// Initialize the periodic Task and read line at a time from "First.txt"
+	struct period_info pinfo;
+	periodic_task_init(&pinfo, PERIOD);
+	
+	//Loop{
+	//Do two lines then wait rest of period
+	//}
+	for(int i = 0; i < 20; i++){
+		strcpy(fullString[i] ,myBuffers->sBuffer1);
+		i++;
+		strcpy(fullString[i] ,myBuffers->sBuffer2);
+		wait_rest_of_period(&pinfo);
+	}
+	//Exit pthread
+	pthread_exit(0);
 }
 
 // Creates three threads, one for each of the functions above and then prints the results.
@@ -145,7 +184,7 @@ void print_results(){
 static void periodic_task_init(struct period_info *pinfo, long period) {
 	pinfo->period_ns = period;
 
-	// clockgettime(CLOCK_MONOTONIC, &(pinfo->next_period));// ?? TODO
+	clock_gettime(CLOCK_MONOTONIC, &(pinfo->next_period));// ?? TODO
 }
 
 
@@ -166,6 +205,6 @@ static void wait_rest_of_period(struct period_info *pinfo) {
 	increment_period(pinfo);
 
 	/* for simplicity, ignoring possibilities of signal wakes */
-	// clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &pinfo->next_period, NULL); //TODO
+	clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &pinfo->next_period, NULL); //TODO
 
 }
