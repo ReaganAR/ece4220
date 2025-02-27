@@ -13,7 +13,7 @@
 #include <errno.h>
 
 #define MY_PRIORITY (49)  // kernel is priority 50
-#define PERIOD 10000000
+#define PERIOD 500000
 
 void print_results();
 
@@ -175,7 +175,7 @@ int main(void) {
 
 // Function to print out results
 void print_results(){
-	for(int line = 0; line < 20; line++){
+	for(int line = 0; line < 16; line++){
 		printf("%s\n", fullString[line]);
 	}
 }
