@@ -70,7 +70,7 @@ void *getFirstThd(void *ptr){
 	//Loop{
 	//Read a line then wait_rest_of_period
 	//}
-	while(fgets(commonBuff, sizeof commonBuff, file) != NULL){
+	while(fgets(commonBuff,  256, file) != NULL){
 
 		wait_rest_of_period(&pinfo);
 		
@@ -110,7 +110,7 @@ void *getSecThd(void *ptr) {
 	//Loop{
 	//Read a line then wait_rest_of_period
 	//}
-	while(fgets(commonBuff, sizeof commonBuff, file) != NULL){
+	while(fgets(commonBuff, 256, file) != NULL){
 		wait_rest_of_period(&pinfo);
 		
 	}
