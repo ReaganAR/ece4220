@@ -20,13 +20,21 @@
 #define OVERRIDE 20
 
 #define PRIOR_A 20
-#define PRIOR_B 20
-#define PRIOR_P 80
+#define PRIOR_B 5
+#define PRIOR_P 49
 
 sem_t mutex;
 
 // Direction A thread
 void* DirectionA(void* ptr) {
+    struct sched_param param;
+    param.sched_priority = PRIOR_A;
+    if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
+        printf("Run the program as a sudo user\n");
+ 	    perror("sched_setscheduler failed, thread 1");
+    	exit(20);
+    }
+
     while(TRUE) {
         sem_wait(&mutex);
         digitalWrite(DIR_A_PIN, HIGH);
@@ -40,6 +48,14 @@ void* DirectionA(void* ptr) {
 
 // Direction B thread
 void* DirectionB(void* ptr) {
+    struct sched_param param;
+    param.sched_priority = PRIOR_B;
+    if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
+        printf("Run the program as a sudo user\n");
+ 	    perror("sched_setscheduler failed, thread 1");
+    	exit(20);
+    }
+
     while(TRUE) {
         sem_wait(&mutex);
         digitalWrite(DIR_B_PIN, HIGH);
@@ -53,6 +69,14 @@ void* DirectionB(void* ptr) {
 
 // Pedestrian Crossing thread
 void* Pedestrian(void* ptr) {
+    struct sched_param param;
+    param.sched_priority = PRIOR_P;
+    if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
+        printf("Run the program as a sudo user\n");
+ 	    perror("sched_setscheduler failed, thread 1");
+    	exit(20);
+    }
+
     while(TRUE) {
         if(digitalRead(BUTTON) == HIGH){
             sem_wait(&mutex);
@@ -66,9 +90,8 @@ void* Pedestrian(void* ptr) {
     pthread_exit(0);
 }
 
-// Main thread
-int main(void) {
-    pthread_attr_t attrA, attrB, attrPed; // 1,2,Pedestrian
+
+int main(void){
     pthread_t dirA, dirB, ped;
 
     // Perform WiringPi setup functions, including setting up required pins
@@ -91,33 +114,18 @@ int main(void) {
     pullUpDnControl(OVERRIDE, PUD_DOWN);
 
     // Set priorities
-    struct sched_param param;
-    pthread_attr_init(&attrA);
-    // pthread_attr_getschedparam(&attrA, &param);
-    pthread_attr_setschedpolicy(&attrA, SCHED_FIFO);
-    param.sched_priority = PRIOR_A;
-    pthread_attr_setschedparam(&attrA, &param);
+    
 
-    struct sched_param param2;
-    pthread_attr_init(&attrB);
-    // pthread_attr_getschedparam(&attrB, &param2);
-    pthread_attr_setschedpolicy(&attrB, SCHED_FIFO);
-    param2.sched_priority = PRIOR_B;
-    pthread_attr_setschedparam(&attrB, &param2);
-
-    struct sched_param paramPed;
-    pthread_attr_init(&attrPed);
-    pthread_attr_setschedpolicy(&attrPed, SCHED_FIFO);
-    paramPed.sched_priority = PRIOR_P;
-    pthread_attr_setschedparam(&attrPed, &paramPed);
+    
+    
 
     // Release semaphore
     sem_init(&mutex, 0, 1);
 
     // Run scheduler threads
-    if( pthread_create(&dirA, &attrA, &DirectionA, NULL) != 0 ||
-        pthread_create(&dirB, &attrB, &DirectionB, NULL) != 0 ||
-        pthread_create(&ped, &attrPed, &Pedestrian, NULL)!= 0){
+    if( pthread_create(&dirA, NULL, &DirectionA, NULL) != 0 ||
+        pthread_create(&dirB, NULL, &DirectionB, NULL) != 0 ||
+        pthread_create(&ped, NULL, &Pedestrian, NULL)!= 0){
             printf("Thread creation error");
             return 0;
     }
