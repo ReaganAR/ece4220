@@ -19,6 +19,10 @@
 
 #define OVERRIDE 20
 
+#define PRIOR_A 20
+#define PRIOR_B 20
+#define PRIOR_P 80
+
 sem_t mutex;
 
 // Direction A thread
@@ -29,7 +33,7 @@ void* DirectionA(void* ptr) {
         sleep(2);
         digitalWrite(DIR_A_PIN, LOW);
         sem_post(&mutex);
-        sleep(1);
+        usleep(1000);
     }
     pthread_exit(0);
 }
@@ -42,7 +46,7 @@ void* DirectionB(void* ptr) {
         sleep(2);
         digitalWrite(DIR_B_PIN, LOW);
         sem_post(&mutex);
-        sleep(1);
+        usleep(1000);
     }
     pthread_exit(0);
 }
@@ -50,13 +54,13 @@ void* DirectionB(void* ptr) {
 // Pedestrian Crossing thread
 void* Pedestrian(void* ptr) {
     while(TRUE) {
-        if(digitalRead(PED_BTN) == HIGH){
+        if(digitalRead(BUTTON) == HIGH){
             sem_wait(&mutex);
             digitalWrite(PEDES_PIN, HIGH);
             sleep(2);
             digitalWrite(PEDES_PIN, LOW);
             sem_post(&mutex);
-            sleep(1);
+            usleep(1000);
         }
     }
     pthread_exit(0);
@@ -65,7 +69,7 @@ void* Pedestrian(void* ptr) {
 // Main thread
 int main(void) {
     pthread_attr_t attrA, attrB, attrPed; // 1,2,Pedestrian
-    pthread_t dirA, dirB, ped
+    pthread_t dirA, dirB, ped;
 
     // Perform WiringPi setup functions, including setting up required pins
     wiringPiSetupGpio();
@@ -90,43 +94,46 @@ int main(void) {
     struct sched_param param;
     pthread_attr_init(&attrA);
     // pthread_attr_getschedparam(&attrA, &param);
-    pthread_attr_setschedpolicy(&attrA, SCHED_RR);
-    param.sched_priority = 10;
+    pthread_attr_setschedpolicy(&attrA, SCHED_FIFO);
+    param.sched_priority = PRIOR_A;
     pthread_attr_setschedparam(&attrA, &param);
 
     struct sched_param param2;
     pthread_attr_init(&attrB);
     // pthread_attr_getschedparam(&attrB, &param2);
-    pthread_attr_setschedpolicy(&attrB, SCHED_RR);
-    param2.sched_priority = 10;
+    pthread_attr_setschedpolicy(&attrB, SCHED_FIFO);
+    param2.sched_priority = PRIOR_B;
     pthread_attr_setschedparam(&attrB, &param2);
 
     struct sched_param paramPed;
     pthread_attr_init(&attrPed);
-    pthread_attr_setschedpolicy(&attrPed, SCHED_RR);
-    paramPed.sched_priority = 10;
+    pthread_attr_setschedpolicy(&attrPed, SCHED_FIFO);
+    paramPed.sched_priority = PRIOR_P;
     pthread_attr_setschedparam(&attrPed, &paramPed);
 
-    // Run scheduler threads
-    pthread_create(&dirA, &attrA, &DirectionA, NULL);
-    pthread_create(&dirB, &attrB, &DirectionB, NULL);
-    pthread_create(&ped, &attrPed, &Pedestrian, NULL);
-
     // Release semaphore
-    sem_init(&mutex, 1, 1);
+    sem_init(&mutex, 0, 1);
+
+    // Run scheduler threads
+    if( pthread_create(&dirA, &attrA, &DirectionA, NULL) != 0 ||
+        pthread_create(&dirB, &attrB, &DirectionB, NULL) != 0 ||
+        pthread_create(&ped, &attrPed, &Pedestrian, NULL)!= 0){
+            printf("Thread creation error");
+            return 0;
+    }
 
     // Threads continue running until OVERRIDE button pressed
     while(!digitalRead(OVERRIDE)) {
         sleep(1);
     }
 
-    pthread_cancel(thrd1);
-    pthread_cancel(thrd2);
-    pthread_cancel(thrd3);
+    pthread_cancel(dirA);
+    pthread_cancel(dirB);
+    pthread_cancel(ped);
 
-    pthread_join(thrd1, NULL);
-    pthread_join(thrd2, NULL);
-    pthread_join(thrd3, NULL);
+    pthread_join(dirA, NULL);
+    pthread_join(dirB, NULL);
+    pthread_join(ped, NULL);
 
     digitalWrite(3, LOW);
     digitalWrite(5, LOW);
