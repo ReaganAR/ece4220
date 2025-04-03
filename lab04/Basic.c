@@ -36,28 +36,27 @@ void* Child_Thread(void*);
 
 int main(void){
 	pthread_t thrd0;
-	pthread_create(&thrd0, NULL, &Thread0, NULL);
-	
+
+
 	int pfd = open("/tmp/N_pipe1", O_RDONLY);
 	mkfifo("/tmp/N_pipe2", 0666);
+
+	// if( pthread_create(&thrd0, NULL, &Thread0, NULL) != 0 ) {printf("Thread creation error"); return 0;}
+
 	int pfd2 = open("tmp/N_pipe2", O_RDONLY);
-	
-	pthread_t thrd1;
+
 	
 	clock_t currTime;
-	
 	while (1) {
-
 		// Read from N_Pipe1 and store the values in buffer sizeof(char)
 		//Store the reading in location[0]
 		while(read(pfd, buffer, sizeof(char)) <= 0) {}
-		location[0] = buffer;
+		location[0] = buffer[0];
 		//get time convert it to milliseconds
 		currTime = clock();
 		timestamp = (long long) currTime * 1000 / CLOCKS_PER_SEC;
+		if( pthread_create(&thrd0, NULL, &Child_Thread, NULL) != 0 ) {printf("Thread creation error"); return 0;}
 
-		// pthread_create(&thrd1, NULL, &Child_Thread, NULL);
-		// write(pfd2, )
 	}
 
 	// Join thread -- won't reach here anyways!
@@ -73,9 +72,14 @@ int main(void){
 
 
 void* Thread0(void* ptr) {
+	// Create N_PIPe2, create real time task that uses it and writes to it
+	// Then read (which blocks) npipe2 and create a new thread whenever detected
+	// The new thread ( child thread) 
 	// Read from N_Pipe2 and store the values in time_buffer sizeof(long)
-	int pfd2 = open("tmp/N_pipe2", O_RDONLY);
-	if(pfd2 == -1) { printf("Failed to open N_pipe2"); }
+
+	while(1){
+
+	}
 
 	pthread_exit(NULL);
 }

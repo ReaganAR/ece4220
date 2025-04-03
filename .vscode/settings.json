@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "fcntl.h": "c",
+        "timerfd.h": "c",
+        "time.h": "c"
+    }
+}
