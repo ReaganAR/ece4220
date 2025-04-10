@@ -1,16 +1,26 @@
-#include <stdio.h>
+// #include <stdio.h>
 #include <stdlib.h>
+// #include <unistd.h>
+// #include <string.h>
+#include <sys/types.h>
+// #include <sys/socket.h>
+// #include <netinet/in.h>
+#include <netdb.h>
+// #include <arpa/inet.h>
+
+
+#include <stdio.h>
 #include <unistd.h>
-#include <string.h>
+#include <string.h> /* For strncpy */
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
-#include <netdb.h>
+#include <net/if.h>
 #include <arpa/inet.h>
 
 #define MSG_SIZE 40			// message size
-#define BROADCAST_ADDR ""
-#define 
+char* BROADCAST_ADDR = "128.206.23.255";
 
 void error(const char *msg)
 {
@@ -26,7 +36,9 @@ int main(int argc, char *argv[])
     struct sockaddr_in server;
     struct sockaddr_in addr;
     char buffer[MSG_SIZE];	// to store received messages or messages to be sent.
-    bool isMaster = false;
+    int isMaster = 0;
+
+    int myVote = 0;
 
     if (argc < 2)
     {
@@ -34,74 +46,96 @@ int main(int argc, char *argv[])
         exit(0);
     }
 
-   sock = socket(AF_INET, SOCK_DGRAM, 0); // Creates socket. Connectionless.
-   if (sock < 0)
-	   error("Opening socket");
+    sock = socket(AF_INET, SOCK_DGRAM, 0); // Creates socket. Connectionless.
+    if (sock < 0)
+        error("Opening socket");
 
-   length = sizeof(server);			// length of structure
-   bzero(&server,length);			// sets all values to zero. memset() could be used
-   server.sin_family = AF_INET;		// symbol constant for Internet domain
-   server.sin_addr.s_addr = INADDR_ANY;		// IP address of the machine on which
-											// the server is running
-   server.sin_port = htons(atoi(argv[1]));	// port number
 
-   // binds the socket to the address of the host and the port number
-   if (bind(sock, (struct sockaddr *)&server, length) < 0)
-       error("binding");
+    length = sizeof(server);			// length of structure
+    bzero(&server,length);			// sets all values to zero. memset() could be used
+    server.sin_family = AF_INET;		// symbol constant for Internet domain
+    server.sin_addr.s_addr = INADDR_ANY;		// IP address of the machine on which
+                                            // the server is running
+    server.sin_port = htons(atoi(argv[1]));	// port number
 
-   // change socket permissions to allow broadcast
-   if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &boolval, sizeof(boolval)) < 0)
-   	{
-   		printf("error setting socket options\n");
-   		exit(-1);
-   	}
+    // binds the socket to the address of the host and the port number
+    if (bind(sock, (struct sockaddr *)&server, length) < 0)
+        error("binding");
 
-   fromlen = sizeof(struct sockaddr_in);	// size of structure
+    // change socket permissions to allow broadcast
+    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &boolval, sizeof(boolval)) < 0)
+    {
+        printf("error setting socket options\n");
+        exit(-1);
+    }
 
-   while (1)
-   {
-	   // bzero: to "clean up" the buffer. The messages aren't always the same length...
-	   bzero(buffer,MSG_SIZE);		// sets all values to zero. memset() could be used
+    fromlen = sizeof(struct sockaddr_in);	// size of structure
 
-	   // receive from a client
-	   n = recvfrom(sock, buffer, MSG_SIZE, 0, (struct sockaddr *)&addr, &fromlen);
-       if (n < 0)
-    	   error("recvfrom"); 
+    // Gather this instance's Ip
 
-       printf("Received a datagram. It says: %s", buffer);
+
+
+
+
+
+    char sendMessage[MSG_SIZE]; // Stores most recently sent message
+    while (1)
+    {
+        // bzero: to "clean up" the buffer. The messages aren't always the same length...
+        bzero(buffer,MSG_SIZE);		// sets all values to zero. memset() could be used
+
+        // receive from a client
+        n = recvfrom(sock, buffer, MSG_SIZE, 0, (struct sockaddr *)&addr, &fromlen);
+        if (n < 0)
+            error("recvfrom"); 
+
+        printf("Received a datagram. It says: %s\n", buffer);
 
         // To send a broadcast message, we need to change IP address to broadcast address
         // If we don't change it (with the following line of code), the message
         // would be transmitted to the address from which the message was received.
         // You may need to change the address below (check ifconfig)
-        addr.sin_addr.s_addr = inet_addr(BROADCAST_ADDR); //inet_addr("128.206.19.255");		// broadcast address
+        addr.sin_addr.s_addr = inet_addr(BROADCAST_ADDR);
 
-        // n = sendto(sock, "Got a message. Was it from you?\n", 32, 0,
-        //             (struct sockaddr *)&addr, fromlen);
-        // if (n  < 0)
-        //     error("sendto");
 
-        // Process incoming string
-        if(strcmp(buffer, "WHOIS\n") == 0){
-            printf("WHOIS received\n");
-            if(isMaster){
-                string sendMessage[MSG_SIZE] = "Reagan on board " + BROADCAST_ADDR + " is the master"
+        // Process incoming string and verify we are not reading our previously sent message
+        if(strcmp(buffer, sendMessage) != 0){   
+            bzero(sendMessage,MSG_SIZE);
+
+            if(strcmp(buffer, "WHOIS\n") == 0){ // WHOIS RECEIVED
+                if(isMaster){
+                    char sendMessage[MSG_SIZE] = "Reagan is master on 128.206.22.105\n";
+                    sendto(sock, sendMessage, MSG_SIZE, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
+                    printf("Sending message: %s", sendMessage);
+                }
+            }
+            else if(strcmp(buffer, "VOTE\n") == 0){ // VOTE COMMAND RECEIVED
+                strcpy(sendMessage, "# 128.206.22.105 ");
+                char num[40];
+                myVote = rand() % 10;
+                sprintf(num, "%d\n", myVote); // Returns 0-9 inclusive
+                strcat(sendMessage, num);
                 sendto(sock, sendMessage, MSG_SIZE, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
                 printf("Sending message: %s", sendMessage);
+                isMaster = 1;
+            }
+            else if(buffer[0] == '#'){ // VOTE BALLOT RECEIVED
+                printf("Vote Received: %d\tMy Vote: %d\n", buffer[17] - '0', myVote);
+                if(buffer[17] - '0' == myVote) {
+                    if(buffer[15] > BROADCAST_ADDR[13]){
+                        isMaster = 0;
+                        printf("Tied vote, relinquishing to higher IP\n");
+                    }
+                }
+                if(buffer[17] - '0' > myVote) {
+                    isMaster = 0;
+                    printf("Lost vote, relinquishing to higher vote\n");
+                }
+
             }
         }
-        else if(strcmp(buffer, "VOTE\n") == 0){
-            printf("VOTE received\n");
-            string sendMessage[MSG_SIZE] = '#' + BROADCAST_ADDR + ' ' + (rand() % 10 + 1);
-            sendto(sock, sendMessage, MSG_SIZE, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
-            printf("Sending message: %s", sendMessage);
-        }
-        else if(buffer[0] == '#'){
-            printf("Vote number received\n");
-        }
-
         
-   }
+    }
 
-   return 0;
- }
+    return 0;
+}
