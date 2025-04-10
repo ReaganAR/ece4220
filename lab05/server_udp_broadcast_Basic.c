@@ -1,8 +1,3 @@
-/* 	Name       : 	server_udp_broadcast.c
-	Author     : 	Luis A. Rivera
-	Description: 	Simple server (broadcast)
-					ECE4220/7220		*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -14,6 +9,8 @@
 #include <arpa/inet.h>
 
 #define MSG_SIZE 40			// message size
+#define BROADCAST_ADDR ""
+#define 
 
 void error(const char *msg)
 {
@@ -23,18 +20,19 @@ void error(const char *msg)
 
 int main(int argc, char *argv[])
 {
-   int sock, length, n;
-   int boolval = 1;			// for a socket option
-   socklen_t fromlen;
-   struct sockaddr_in server;
-   struct sockaddr_in addr;
-   char buffer[MSG_SIZE];	// to store received messages or messages to be sent.
+    int sock, length, n;
+    int boolval = 1;			// for a socket option
+    socklen_t fromlen;
+    struct sockaddr_in server;
+    struct sockaddr_in addr;
+    char buffer[MSG_SIZE];	// to store received messages or messages to be sent.
+    bool isMaster = false;
 
-   if (argc < 2)
-   {
-	  printf("usage: %s port\n", argv[0]);
-      exit(0);
-   }
+    if (argc < 2)
+    {
+        printf("usage: %s port\n", argv[0]);
+        exit(0);
+    }
 
    sock = socket(AF_INET, SOCK_DGRAM, 0); // Creates socket. Connectionless.
    if (sock < 0)
@@ -72,16 +70,37 @@ int main(int argc, char *argv[])
 
        printf("Received a datagram. It says: %s", buffer);
 
-       // To send a broadcast message, we need to change IP address to broadcast address
-       // If we don't change it (with the following line of code), the message
-       // would be transmitted to the address from which the message was received.
-	   // You may need to change the address below (check ifconfig)
-       addr.sin_addr.s_addr = inet_addr("10.14.1.255"); //inet_addr("128.206.19.255");		// broadcast address
+        // To send a broadcast message, we need to change IP address to broadcast address
+        // If we don't change it (with the following line of code), the message
+        // would be transmitted to the address from which the message was received.
+        // You may need to change the address below (check ifconfig)
+        addr.sin_addr.s_addr = inet_addr(BROADCAST_ADDR); //inet_addr("128.206.19.255");		// broadcast address
 
-       n = sendto(sock, "Got a message. Was it from you?\n", 32, 0,
-    		      (struct sockaddr *)&addr, fromlen);
-       if (n  < 0)
-    	   error("sendto");
+        // n = sendto(sock, "Got a message. Was it from you?\n", 32, 0,
+        //             (struct sockaddr *)&addr, fromlen);
+        // if (n  < 0)
+        //     error("sendto");
+
+        // Process incoming string
+        if(strcmp(buffer, "WHOIS\n") == 0){
+            printf("WHOIS received\n");
+            if(isMaster){
+                string sendMessage[MSG_SIZE] = "Reagan on board " + BROADCAST_ADDR + " is the master"
+                sendto(sock, sendMessage, MSG_SIZE, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
+                printf("Sending message: %s", sendMessage);
+            }
+        }
+        else if(strcmp(buffer, "VOTE\n") == 0){
+            printf("VOTE received\n");
+            string sendMessage[MSG_SIZE] = '#' + BROADCAST_ADDR + ' ' + (rand() % 10 + 1);
+            sendto(sock, sendMessage, MSG_SIZE, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
+            printf("Sending message: %s", sendMessage);
+        }
+        else if(buffer[0] == '#'){
+            printf("Vote number received\n");
+        }
+
+        
    }
 
    return 0;
