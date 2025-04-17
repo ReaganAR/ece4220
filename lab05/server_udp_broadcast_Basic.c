@@ -1,23 +1,15 @@
-// #include <stdio.h>
-#include <stdlib.h>
-// #include <unistd.h>
-// #include <string.h>
-#include <sys/types.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-#include <netdb.h>
-// #include <arpa/inet.h>
-
-
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <string.h> /* For strncpy */
+#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/ioctl.h>
 #include <netinet/in.h>
-#include <net/if.h>
+#include <netdb.h>
 #include <arpa/inet.h>
+
+#include <sys/ioctl.h>
+#include <net/if.h>
 
 #define MSG_SIZE 40			// message size
 char* BROADCAST_ADDR = "128.206.23.255";
@@ -37,8 +29,11 @@ int main(int argc, char *argv[])
     struct sockaddr_in addr;
     char buffer[MSG_SIZE];	// to store received messages or messages to be sent.
     int isMaster = 0;
-
     int myVote = 0;
+
+    // Vars for dynamic IP
+    struct ifreq ifr;
+    char ip[INET_ADDRSTRLEN];
 
     if (argc < 2)
     {
@@ -49,6 +44,22 @@ int main(int argc, char *argv[])
     sock = socket(AF_INET, SOCK_DGRAM, 0); // Creates socket. Connectionless.
     if (sock < 0)
         error("Opening socket");
+
+    /* Gather the IP of the local interface  - - - - - - - - - - - - - - - - - - - - - - - */
+    // Specify the interface you're interested in
+    strncpy(ifr.ifr_name, "wlan0", IFNAMSIZ-1);
+    ifr.ifr_name[IFNAMSIZ-1] = '\0';  // Just to be safe
+
+    // Ioctl to get the IP address
+    if (ioctl(sock, SIOCGIFADDR, &ifr) < 0) {
+        perror("ioctl(SIOCGIFADDR)");
+        close(sock);
+        return 1;
+    }
+
+    struct sockaddr_in *ipaddr = (struct sockaddr_in *)&ifr.ifr_addr;
+    inet_ntop(AF_INET, &ipaddr->sin_addr, ip, sizeof(ip));
+    printf("wlan0 IP address: %s\n", ip);
 
 
     length = sizeof(server);			// length of structure
@@ -70,14 +81,6 @@ int main(int argc, char *argv[])
     }
 
     fromlen = sizeof(struct sockaddr_in);	// size of structure
-
-    // Gather this instance's Ip
-
-
-
-
-
-
     char sendMessage[MSG_SIZE]; // Stores most recently sent message
     while (1)
     {
@@ -104,16 +107,19 @@ int main(int argc, char *argv[])
 
             if(strcmp(buffer, "WHOIS\n") == 0){ // WHOIS RECEIVED
                 if(isMaster){
-                    char sendMessage[MSG_SIZE] = "Reagan is master on 128.206.22.105\n";
+                    char sendMessage[MSG_SIZE] = "Reagan is master on ";
+                    strcat(sendMessage, ip);
+                    strcat(sendMessage, "\n");
                     sendto(sock, sendMessage, MSG_SIZE, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
                     printf("Sending message: %s", sendMessage);
                 }
             }
             else if(strcmp(buffer, "VOTE\n") == 0){ // VOTE COMMAND RECEIVED
-                strcpy(sendMessage, "# 128.206.22.105 ");
+                strcpy(sendMessage, "# ");
+                strcat(sendMessage, ip);
                 char num[40];
                 myVote = rand() % 10;
-                sprintf(num, "%d\n", myVote); // Returns 0-9 inclusive
+                sprintf(num, " %d\n", myVote); // Returns 0-9 inclusive
                 strcat(sendMessage, num);
                 sendto(sock, sendMessage, MSG_SIZE, 0, (struct sockaddr *)&addr, sizeof(struct sockaddr_in));
                 printf("Sending message: %s", sendMessage);
