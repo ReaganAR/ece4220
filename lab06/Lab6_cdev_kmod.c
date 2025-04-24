@@ -59,12 +59,6 @@
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
 
-
-
-
-
-
-
 #define MSG_SIZE 40
 #define CDEV_NAME "Lab6"	// "YourDevName"
 
@@ -72,6 +66,151 @@ MODULE_LICENSE("GPL");
  
 static int major; 
 static char msg[MSG_SIZE];
+
+char tone = 'A';
+
+// Declare button GPIOs so IRQ Handler function can point at these
+static int GPIO_Button1 = 16;
+static int GPIO_Button2 = 17;
+static int GPIO_Button3 = 18;
+static int GPIO_Button4 = 19;
+static int GPIO_Button5 = 20;
+
+// Declare IRQs here so they can be freed on removal
+static int IRQ_Button1;
+static int IRQ_Button2;
+static int IRQ_Button3;
+static int IRQ_Button4;
+static int IRQ_Button5;
+
+static const struct gpio buttons[] = {
+	{ 16 }, 
+	{ 17 }, 
+	{ 18 },
+	{ 19 },
+	{ 20 }
+};
+
+static struct task_struct *kthread1;
+
+/* Interrupt handler for all five button GPIO pins. Will be called on a raising edge.
+ * dev_id is an int pointer pointing at the GPIO pin # raised.
+ */
+static irqreturn_t gpio_irq_handler(int irq,void *dev_id) {
+    // Switch based on dev_id to determine which button was pressed
+	switch(*(int*) dev_id){
+		case 16: // Button 1
+			printk("Message from button: A\n");
+			tone='A';
+			break;
+		case 17: // Button 2
+			printk("Message from button: B\n");
+			tone='B';
+			break;
+
+		case 18: // Button 3
+			printk("Message from button: C\n");
+			tone='C';
+			break;
+		case 19: // Button 4
+			printk("Message from button: D\n");
+			tone='D';
+			break;
+		case 20: // Button 5
+			printk("Message from button: E\n");
+			tone='E';
+			break;
+		default:
+			break;
+	}
+  
+	return IRQ_HANDLED;
+}
+
+
+// Function to be associated with the kthread; what the kthread executes.
+int kthread_fn(void *ptr)
+{
+	printk("In kthread_fn\n");
+
+	// The ktrhead does not need to run forever. It can execute something
+	// and then leave.
+	while(1)
+	{
+
+		// Write code to generate a square wave on BCM 6 (SPKR) (GPIO_OUT6)
+		if(tone == 'A'){
+			gpio_set_value(6, 1);
+			udelay(1800);
+			gpio_set_value(6, 0);
+			udelay(1800);
+		}
+
+		else if(tone == 'B'){
+			gpio_set_value(6, 1);
+			udelay(1600);
+			gpio_set_value(6, 0);
+			udelay(1600);
+		}
+
+		else if(tone == 'C'){
+			gpio_set_value(6, 1);
+			udelay(1400);
+			gpio_set_value(6, 0);
+			udelay(1400);
+		}
+
+		else if(tone == 'D'){
+			gpio_set_value(6, 1);
+			udelay(1200);
+			gpio_set_value(6, 0);
+			udelay(1200);
+		}
+
+		else if(tone == 'E'){
+			gpio_set_value(6, 1);
+			udelay(1000);
+			gpio_set_value(6, 0);
+			udelay(1000);
+		}
+		
+
+
+
+		//msleep(1000);	// good for > 10 ms
+		//msleep_interruptible(1000); // good for > 10 ms
+		//udelay(unsigned long usecs);	// good for a few us (micro s)
+		//usleep_range(unsigned long min, unsigned long max); // good for 10us - 20 ms
+		
+		
+		// In an infinite loop, you should check if the kthread_stop
+		// function has been called (e.g. in clean up module). If so,
+		// the kthread should exit. If this is not done, the thread
+		// will persist even after removing the module.
+		if(kthread_should_stop()) {
+			do_exit(0);
+		}
+				
+		// comment out if your loop is going "fast". You don't want to
+		// printk too often. Sporadically or every second or so, it's okay.
+		//printk("Count: %d\n", ++count);
+	}
+	
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // Function called when the user space program reads the character device.
 // Some arguments not used here.
@@ -114,6 +253,7 @@ static ssize_t device_write(struct file *filp, const char __user *buff, size_t l
 	
 	// You may want to remove the following printk in your final version.
 	printk("Message from user space: %s\n", msg);
+	tone = msg[0];
 	
 	return len;		// the number of bytes that were written to the Character Device.
 }
@@ -135,16 +275,93 @@ int cdev_module_init(void)
 	}
 	printk("Lab6_cdev_kmod example, assigned major: %d\n", major);
 	printk("Create Char Device (node) with: sudo mknod /dev/%s c %d 0\n", CDEV_NAME, major);
+
+	// register the kernel module and ISRs required for button presses
+	// Request Input Pins
+	if (gpio_request_array(buttons, ARRAY_SIZE(buttons)) != 0) {
+        printk(KERN_NOTICE "Could not request button GPIO pins");
+        return -1;
+    }
+
+	gpio_request(6,NULL);
+	gpio_direction_output(6, 0);
+	
+	gpio_direction_input(16);
+	gpio_direction_input(17);
+    gpio_direction_input(18);
+	gpio_direction_input(19);
+	gpio_direction_input(20);
+
+
+
+	// Assign IRQs from button GPIOs
+	IRQ_Button1 = gpio_to_irq(16);
+	IRQ_Button2 = gpio_to_irq(17);
+	IRQ_Button3 = gpio_to_irq(18);
+	IRQ_Button4 = gpio_to_irq(19);
+	IRQ_Button5 = gpio_to_irq(20);
+
+	 	/* Request the interrupt / attach handlers
+ 	 * Enable (Async) Rising Edge detection
+	 * The Fourth argument string can be different (you give the name)
+	 * The last argument is a variable needed to identify the handler, but can be set to NULL
+	 */
+	if (
+	request_irq(IRQ_Button1,(void *)gpio_irq_handler, IRQF_TRIGGER_RISING,"Button Interrupt 1", &GPIO_Button1) ||     //device id for shared IRQ
+	request_irq(IRQ_Button2,(void *)gpio_irq_handler, IRQF_TRIGGER_RISING,"Button Interrupt 2", &GPIO_Button2) ||
+	request_irq(IRQ_Button3,(void *)gpio_irq_handler, IRQF_TRIGGER_RISING,"Button Interrupt 3", &GPIO_Button3) ||
+	request_irq(IRQ_Button4,(void *)gpio_irq_handler, IRQF_TRIGGER_RISING,"Button Interrupt 4", &GPIO_Button4) ||
+	request_irq(IRQ_Button5,(void *)gpio_irq_handler, IRQF_TRIGGER_RISING,"Button Interrupt 5", &GPIO_Button5) != 0) {
+		printk(KERN_NOTICE "Could not request IRQs");
+		return -1;
+	}
+
+	// Create kernel module which plays the note specified
+	char kthread_name[]="SoundGeneration_kthread";	// try running  ps -ef | grep SoundGeneration
+	kthread1 = kthread_create(kthread_fn, NULL, kthread_name);
+	
+    if((kthread1))	// true if kthread creation is successful
+    {
+        printk("Inside if\n");
+		// kthread is dormant after creation. Needs to be woken up
+        wake_up_process(kthread1);
+    }
+
+
+
+
+
+	printk(KERN_INFO "*************Module Inserted**********\n");
  	return 0;
 }
 
 void cdev_module_exit(void)
 {
+	// Remove the interrupt Handlers
+	free_irq(IRQ_Button1, &GPIO_Button1);
+	free_irq(IRQ_Button2, &GPIO_Button2);
+	free_irq(IRQ_Button3, &GPIO_Button3);
+	free_irq(IRQ_Button4, &GPIO_Button4);
+	free_irq(IRQ_Button5, &GPIO_Button5);
+
+	gpio_free_array(buttons, ARRAY_SIZE(buttons));
+	gpio_free(6);
+
 	// Once unregistered, the Character Device won't be able to be accessed,
 	// even if the file /dev/YourDevName still exists. Give that a try...
 	unregister_chrdev(major, CDEV_NAME);
 	printk("Char Device /dev/%s unregistered.\n", CDEV_NAME);
-}  
 
+	
+	int ret;
+	// the following doesn't actually stop the thread, but signals that
+	// the thread should stop itself (with do_exit above).
+	// kthread should not be called if the thread has already stopped.
+	ret = kthread_stop(kthread1);
+								
+	if(!ret)
+		printk("Kthread stopped\n");
+
+}
 module_init(cdev_module_init);
 module_exit(cdev_module_exit);
