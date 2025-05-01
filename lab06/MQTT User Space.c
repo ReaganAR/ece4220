@@ -60,7 +60,7 @@ struct mosquitto *mosq;
 void on_connect(struct mosquitto *mosq, void *obj, int rc) {
 	printf("ID: %d\n", * (int *) obj);
 	if(rc) {printf("Error with result code: %d\n", rc);exit(-1);}
-	mosquitto_subscribe(mosq, NULL, "Election/E1/E2", 0);
+	mosquitto_subscribe(mosq, NULL, "Election", 0);
 }
 
 void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg) {
@@ -87,7 +87,7 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 
 
         if((master == 1) && (strncmp(buffer,bufferPrev,2)) !=0  ) 
-        { mosquitto_publish(mosq, NULL, "Election/E1/E2", sizeof(buffer), buffer, 0, false);
+        { mosquitto_publish(mosq, NULL, "Election", sizeof(buffer), buffer, 0, false);
         }
 
     }
@@ -98,12 +98,12 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
 			if (master == 1)
 			{
 				char *msg1= (char*)malloc(sizeof(char)*40);
-				strcpy(msg1,"Ramy is master on ");
+				strcpy(msg1,"Reagan is master on ");
 
 				strcat(msg1,inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
 				printf("Message To Broadcast: %s \n",msg1);
 
-				mosquitto_publish(mosq, NULL, "Election/E1/E2", MSG_SIZE, msg1, 0, false);
+				mosquitto_publish(mosq, NULL, "Election", MSG_SIZE, msg1, 0, false);
 				free(msg1);
 
 			}
@@ -115,7 +115,7 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
             
 			char *msg2= (char*)malloc(sizeof(char)*20);
             
-			strcat(msg2,"# ");
+			strcpy(msg2,"# ");
 			strcat(msg2,inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr));
             strcat(msg2," ");
             
@@ -130,7 +130,7 @@ void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_messag
             strcat(msg2,"\n");
 			printf("Send msg: %s\n",msg2);
 
-            mosquitto_publish(mosq, NULL, "Election/E1/E2", MSG_SIZE, msg2, 0, false);
+            mosquitto_publish(mosq, NULL, "Election", MSG_SIZE, msg2, 0, false);
 			
 			master = 1;
 
@@ -197,16 +197,21 @@ void ThreadJob1(void *ptr)
 {
 	while(1)
 	{
+		char message[MSG_SIZE];
 		int dummy2 = read(cdev_id, receive, MSG_SIZE);			// Here, user space program would read the note from chracter device.		
         if(dummy2 != sizeof(receive)) {	printf("Read failed, leaving...\n"); break;}
         
         if (receive[0]!='\0')
             {printf("Message from kernel space: %s\n", receive);
-		    printf("dummy2=%d\n",dummy2);
+		    // printf("dummy2=%d\n",dummy2);
+			strcpy(message, "@");
+			strcat(message, receive);
+			printf("If master, sending %s\n", message);
 
             if(master == 1)		// if my server is master, than it would broadcast the note.
 			{
-                mosquitto_publish(mosq, NULL, "Election/E1/E2", MSG_SIZE, receive, 0, false);
+
+                mosquitto_publish(mosq, NULL, "Election", MSG_SIZE, message, 0, false);
 			}
 
 
@@ -253,13 +258,13 @@ if((cdev_id = open(CHAR_DEV, O_RDWR)) == -1) {
 
 
 
-int rc, id=12;
+int rc, id=22;
 mosquitto_lib_init();
 
 mosq = mosquitto_new("subscribe-1", true, &id);
 mosquitto_connect_callback_set(mosq, on_connect);
 mosquitto_message_callback_set(mosq, on_message);
-char *host ="128.206.19.16";
+char *host ="128.206.22.101";
 rc = mosquitto_connect(mosq, host, 1883, 10);
 if(rc) {
     printf("Could not connect to Broker with return code %d\n", rc);

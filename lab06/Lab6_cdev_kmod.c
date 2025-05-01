@@ -66,6 +66,7 @@ MODULE_LICENSE("GPL");
  
 static int major; 
 static char msg[MSG_SIZE];
+static char msg1[MSG_SIZE];
 
 char tone = 'A';
 
@@ -123,6 +124,8 @@ static irqreturn_t gpio_irq_handler(int irq,void *dev_id) {
 		default:
 			break;
 	}
+
+	msg[0] = tone;
   
 	return IRQ_HANDLED;
 }
@@ -245,15 +248,18 @@ static ssize_t device_write(struct file *filp, const char __user *buff, size_t l
 		return -EINVAL;
 	
 	// unsigned long copy_from_user(void *to, const void __user *from, unsigned long n);
-	dummy = copy_from_user(msg, buff, len);	// Transfers the data from user space to kernel space
+	dummy = copy_from_user(msg1, buff, len);	// Transfers the data from user space to kernel space
 	if(len == MSG_SIZE)
-		msg[len-1] = '\0';	// will ignore the last character received.
+		msg1[len-1] = '\0';	// will ignore the last character received.
 	else
-		msg[len] = '\0';
+		msg1[len] = '\0';
 	
 	// You may want to remove the following printk in your final version.
 	printk("Message from user space: %s\n", msg);
-	tone = msg[0];
+
+	if(msg1[0] == '@'){
+		tone = msg1[1];
+	}
 	
 	return len;		// the number of bytes that were written to the Character Device.
 }
